@@ -23,6 +23,17 @@ def get_r2_client():
     )
 
 
+def get_view_url(object_key: str) -> str:
+    """Presigned GET URL, valid for an hour — regenerated fresh on every
+    list/create call rather than stored, since it expires."""
+    client = get_r2_client()
+    return client.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": settings.r2_bucket_name, "Key": object_key},
+        ExpiresIn=3600,
+    )
+
+
 @router.get("/upload-url")
 def get_upload_url(filename: str, current_user: User = Depends(get_current_user)):
     """Returns a presigned URL the app can PUT the file to directly, keeping
@@ -62,6 +73,7 @@ def create_memory(
     db.add(memory)
     db.commit()
     db.refresh(memory)
+    memory.photo_url = get_view_url(memory.r2_object_key)
     return memory
 
 
@@ -72,9 +84,12 @@ def list_memories(
     if not current_user.couple_id:
         raise HTTPException(status_code=400, detail="Pair with your partner first")
 
-    return (
+    memories = (
         db.query(Memory)
         .filter(Memory.couple_id == current_user.couple_id)
         .order_by(Memory.taken_at.desc().nullslast(), Memory.created_at.desc())
         .all()
     )
+    for m in memories:
+        m.photo_url = get_view_url(m.r2_object_key)
+    return memories

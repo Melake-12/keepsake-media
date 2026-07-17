@@ -49,6 +49,7 @@ class MemoryOut(BaseModel):
     caption: str | None
     taken_at: datetime | None
     created_at: datetime
+    photo_url: str | None = None
 
     class Config:
         from_attributes = True
